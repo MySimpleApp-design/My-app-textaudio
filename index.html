@@ -1,116 +1,283 @@
-<!DOCTYPE html><html lang="en">
+<html lang="pt-BR" class="scroll-smooth">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>TextAudio - Leitor Multilingue</title>
-  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" />
-  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;600&display=swap" rel="stylesheet">
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>TextAudio - Conversor de Texto para Áudio Multilíngue</title>
+  <link rel="manifest" href="manifest.json" />
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css" />
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap" rel="stylesheet" />
   <style>
-    body {
+    html, body, #root {
+      height: 100%;
       font-family: 'Poppins', sans-serif;
-      background: #f0f4f8;
+      background-color: #f0f4f8;
+      color: #2c3e50;
       margin: 0;
       padding: 0;
-      display: flex;
-      flex-direction: column;
-      align-items: center;
-      min-height: 100vh;
     }
-    header {
-      background: #2c3e50;
-      color: white;
-      width: 100%;
-      padding: 1rem;
-      text-align: center;
-      font-size: 1.5rem;
-      box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+    ::-webkit-scrollbar {
+      width: 8px;
     }
-    main {
-      width: 100%;
-      max-width: 700px;
-      padding: 2rem;
-    }
-    textarea {
-      width: 100%;
-      height: 200px;
-      padding: 1rem;
-      font-size: 1rem;
-      border-radius: 10px;
-      border: 1px solid #ccc;
-      resize: none;
-    }
-    select, button {
-      margin-top: 1rem;
-      padding: 0.75rem;
-      font-size: 1rem;
-      border-radius: 8px;
-      border: none;
-      cursor: pointer;
-    }
-    select {
-      width: 100%;
-      background-color: #fff;
-      border: 1px solid #ccc;
-    }
-    button {
-      background-color: #3498db;
-      color: white;
-      width: 100%;
-      margin-top: 1.5rem;
-      transition: background-color 0.3s;
-    }
-    button:hover {
-      background-color: #2980b9;
-    }
-    footer {
-      margin-top: auto;
-      padding: 1rem;
-      text-align: center;
-      font-size: 0.8rem;
-      color: #555;
+    ::-webkit-scrollbar-thumb {
+      background-color: #a1a1aa;
+      border-radius: 4px;
     }
   </style>
 </head>
 <body>
-  <header>
-    <i class="fas fa-volume-up"></i> TextAudio - Leitor Multilingue
-  </header>
-  <main>
-    <textarea id="textInput" placeholder="Digite ou cole seu texto aqui..."></textarea>
-    <select id="voiceSelect"></select>
-    <button onclick="speakText()"><i class="fas fa-play"></i> Ouvir Texto</button>
-  </main>
-  <footer>
-    &copy; 2025 TextAudio | App Web Multilingue com TTS
-  </footer>
+  <div id="root"></div>
+
+  <script crossorigin src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+  <script crossorigin src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
   <script>
-    const synth = window.speechSynthesis;
-    const voiceSelect = document.getElementById('voiceSelect');function populateVoices() {
-  const voices = synth.getVoices();
-  voiceSelect.innerHTML = '';
-  voices.forEach(voice => {
-    const option = document.createElement('option');
-    option.textContent = `${voice.name} (${voice.lang})`;
-    option.value = voice.name;
-    voiceSelect.appendChild(option);
-  });
-}
+    const { useState, useEffect, useRef } = React;
 
-synth.onvoiceschanged = populateVoices;
+    function TextAudioApp() {
+      const [text, setText] = useState('');
+      const [voices, setVoices] = useState([]);
+      const [selectedLang, setSelectedLang] = useState('pt-BR');
+      const [selectedVoice, setSelectedVoice] = useState(null);
+      const [speaking, setSpeaking] = useState(false);
+      const synthRef = useRef(window.speechSynthesis);
+      const utteranceRef = useRef(null);
 
-function speakText() {
-  const text = document.getElementById('textInput').value;
-  const selectedVoice = voiceSelect.value;
-  const utterance = new SpeechSynthesisUtterance(text);
-  const voices = synth.getVoices();
-  utterance.voice = voices.find(v => v.name === selectedVoice);
-  synth.speak(utterance);
-}
+      const languages = [
+        { code: 'pt-BR', name: 'Português' },
+        { code: 'en-US', name: 'Inglês' },
+        { code: 'fr-FR', name: 'Francês' },
+        { code: 'es-ES', name: 'Espanhol' },
+        { code: 'sw-KE', name: 'Swahili' },
+        { code: 'ar-SA', name: 'Árabe' },
+      ];
 
-window.onload = () => {
-  populateVoices();
-};
+      function loadVoices() {
+        let availableVoices = synthRef.current.getVoices();
+        if (availableVoices.length === 0) {
+          setTimeout(loadVoices, 100);
+          return;
+        }
+        setVoices(availableVoices);
+      }
 
+      useEffect(() => {
+        loadVoices();
+        if ('onvoiceschanged' in synthRef.current) {
+          synthRef.current.onvoiceschanged = loadVoices;
+        }
+      }, []);
+
+      useEffect(() => {
+        if (voices.length === 0) return;
+        let voice = voices.find(v => v.lang.toLowerCase() === selectedLang.toLowerCase());
+        if (!voice) {
+          const langPrefix = selectedLang.split('-')[0];
+          voice = voices.find(v => v.lang.toLowerCase().startsWith(langPrefix));
+        }
+        if (!voice) voice = voices[0];
+        setSelectedVoice(voice);
+      }, [selectedLang, voices]);
+
+      function speakText() {
+        if (!text.trim()) return;
+        if (synthRef.current.speaking) {
+          synthRef.current.cancel();
+          setSpeaking(false);
+          return;
+        }
+        const utterance = new SpeechSynthesisUtterance(text);
+        utterance.lang = selectedLang;
+        if (selectedVoice) utterance.voice = selectedVoice;
+        utterance.rate = 1;
+        utterance.pitch = 1;
+        utterance.onstart = () => setSpeaking(true);
+        utterance.onend = () => setSpeaking(false);
+        utterance.onerror = () => setSpeaking(false);
+        utteranceRef.current = utterance;
+        synthRef.current.speak(utterance);
+      }
+
+      useEffect(() => {
+        function cleanup() {
+          if (synthRef.current.speaking) {
+            synthRef.current.cancel();
+          }
+        }
+        window.addEventListener('beforeunload', cleanup);
+        return () => window.removeEventListener('beforeunload', cleanup);
+      }, []);
+
+      return (
+        <div className="min-h-screen flex flex-col">
+          <header className="bg-[#2c3e50] text-white shadow-md sticky top-0 z-30">
+            <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+              <div className="flex items-center space-x-3">
+                <img
+                  src="https://placehold.co/40x40?text=TA&font=roboto&bg=3498db&fg=ffffff"
+                  alt="Logotipo do aplicativo TextAudio, letras TA em branco com fundo azul"
+                  className="w-10 h-10 rounded-md"
+                />
+                <h1 className="text-2xl font-semibold select-none">TextAudio</h1>
+              </div>
+              <nav aria-label="Menu de idiomas" className="flex items-center space-x-4">
+                <label htmlFor="language-select" className="sr-only">Selecionar idioma</label>
+                <select
+                  id="language-select"
+                  className="border border-gray-300 rounded-md py-2 px-3 text-gray-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                  value={selectedLang}
+                  onChange={e => setSelectedLang(e.target.value)}
+                  aria-live="polite"
+                  aria-atomic="true"
+                >
+                  {languages.map(({ code, name }) => (
+                    <option key={code} value={code}>{name}</option>
+                  ))}
+                </select>
+              </nav>
+            </div>
+          </header>
+
+          <main className="flex-grow flex flex-col max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-10 w-full">
+            <label htmlFor="text-input" className="mb-3 text-lg font-medium text-gray-700 select-none">
+              Digite ou cole seu texto aqui:
+            </label>
+            <textarea
+              id="text-input"
+              rows="10"
+              className="w-full rounded-lg border border-gray-300 p-4 text-gray-800 text-base resize-y focus:outline-none focus:ring-2 focus:ring-blue-400 focus:border-blue-400 placeholder-gray-400"
+              placeholder="Digite ou cole o texto que deseja ouvir..."
+              value={text}
+              onChange={e => setText(e.target.value)}
+              aria-multiline="true"
+              aria-label="Área para digitar ou colar texto para conversão em áudio"
+            ></textarea>
+
+            <button
+              type="button"
+              onClick={speakText}
+              disabled={!text.trim()}
+              className={`mt-8 w-full sm:w-auto flex items-center justify-center gap-3 rounded-lg px-6 py-3 font-semibold text-white shadow-md transition-colors duration-300 focus:outline-none focus:ring-4 focus:ring-blue-300 ${
+                text.trim()
+                  ? (speaking ? 'bg-red-600 hover:bg-red-700 focus:ring-red-400' : 'bg-blue-600 hover:bg-blue-700 focus:ring-blue-400')
+                  : 'bg-gray-400 cursor-not-allowed'
+              }`}
+              aria-pressed={speaking}
+              aria-live="polite"
+              aria-label={speaking ? "Parar leitura do texto" : "Ouvir texto"}
+            >
+              <i className={`fas ${speaking ? 'fa-stop' : 'fa-play'} text-lg`}></i>
+              {speaking ? 'Parar Leitura' : 'Ouvir Texto'}
+            </button>
+
+            <section className="mt-12 text-center text-gray-500 text-sm select-none">
+              <p>TextAudio &copy; 2025 - Aplicativo Web PWA para conversão de texto em áudio multilingue.</p>
+            </section>
+          </main>
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById('root')).render(<TextAudioApp />);
+  </script>
+
+  <script>
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('sw.js').catch(err => {
+          console.warn('Falha ao registrar service worker:', err);
+        });
+      });
+    }
+  </script>
+
+  <script type="application/json" id="manifest-json">
+  {
+    "name": "TextAudio",
+    "short_name": "TextAudio",
+    "start_url": ".",
+    "display": "standalone",
+    "background_color": "#f0f4f8",
+    "theme_color": "#3498db",
+    "description": "Aplicativo web para converter texto em áudio com suporte multilíngue.",
+    "icons": [
+      {
+        "src": "https://placehold.co/192x192?text=TA&font=roboto&bg=3498db&fg=ffffff",
+        "sizes": "192x192",
+        "type": "image/png"
+      },
+      {
+        "src": "https://placehold.co/512x512?text=TA&font=roboto&bg=3498db&fg=ffffff",
+        "sizes": "512x512",
+        "type": "image/png"
+      }
+    ]
+  }
+  </script>
+
+  <script>
+    const manifestJson = document.getElementById('manifest-json').textContent;
+    const blob = new Blob([manifestJson], { type: 'application/json' });
+    const manifestURL = URL.createObjectURL(blob);
+    const link = document.querySelector('link[rel="manifest"]');
+    if (link) {
+      link.href = manifestURL;
+    }
+  </script>
+
+  <script>
+    const swCode = `
+      const CACHE_NAME = 'textaudio-cache-v1';
+      const FILES_TO_CACHE = [
+        '/',
+        '/index.html',
+        'https://cdn.tailwindcss.com',
+        'https://cdnjs.cloudflare.com/ajax/libs/font-awesome/5.15.3/css/all.min.css',
+        'https://fonts.googleapis.com/css2?family=Poppins:wght@400;600&display=swap'
+      ];
+
+      self.addEventListener('install', (evt) => {
+        evt.waitUntil(
+          caches.open(CACHE_NAME).then((cache) => {
+            return cache.addAll(FILES_TO_CACHE);
+          })
+        );
+        self.skipWaiting();
+      });
+
+      self.addEventListener('activate', (evt) => {
+        evt.waitUntil(
+          caches.keys().then((keyList) => {
+            return Promise.all(
+              keyList.map((key) => {
+                if (key !== CACHE_NAME) {
+                  return caches.delete(key);
+                }
+              })
+            );
+          })
+        );
+        self.clients.claim();
+      });
+
+      self.addEventListener('fetch', (evt) => {
+        if (evt.request.mode !== 'navigate') {
+          return;
+        }
+        evt.respondWith(
+          fetch(evt.request).catch(() => {
+            return caches.match('/');
+          })
+        );
+      });
+    `;
+    const swBlob = new Blob([swCode], { type: 'application/javascript' });
+    const swUrl = URL.createObjectURL(swBlob);
+
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.register(swUrl).catch(err => {
+        console.warn('Falha ao registrar service worker embutido:', err);
+      });
+    }
   </script>
 </body>
 </html>
